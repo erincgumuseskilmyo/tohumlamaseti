@@ -1,0 +1,59 @@
+newmtl steel_brushed
+Kd 0.7255 0.7686 0.7961
+Ks 0.90 0.90 0.90
+Ns 110
+d 1.00
+
+newmtl steel_blue
+Kd 0.1098 0.2235 0.2784
+Ks 0.20 0.20 0.20
+Ns 60
+d 1.00
+
+newmtl steel_blue_lt
+Kd 0.1843 0.3569 0.4353
+Ks 0.30 0.30 0.30
+Ns 80
+d 1.00
+
+newmtl frost_cyan
+Kd 0.5569 0.8392 0.9490
+Ks 0.00 0.00 0.00
+Ns 19
+d 1.00
+
+newmtl white_plastic
+Kd 0.9137 0.9333 0.9412
+Ks 0.00 0.00 0.00
+Ns 100
+d 1.00
+
+newmtl rubber_black
+Kd 0.0824 0.0941 0.1059
+Ks 0.00 0.00 0.00
+Ns 10
+d 1.00
+
+newmtl amber
+Kd 1.0000 0.8196 0.4000
+Ks 0.00 0.00 0.00
+Ns 80
+d 1.00
+
+newmtl led_green
+Kd 0.4314 0.9059 0.6275
+Ks 0.00 0.00 0.00
+Ns 140
+d 1.00
+
+newmtl mercury_red
+Kd 0.8784 0.2667 0.2275
+Ks 0.00 0.00 0.00
+Ns 120
+d 1.00
+
+newmtl glass
+Kd 0.8392 0.9333 0.9725
+Ks 0.00 0.00 0.00
+Ns 190
+d 0.35
