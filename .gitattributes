@@ -1,2 +1,8 @@
 # Auto detect text files and perform LF normalization
 * text=auto
+
+# 3B modeller ikili dosyadır: satir sonu donusumu uygulanmaz, bozulmazlar
+*.glb binary
+*.obj binary
+*.mtl text
+*.py text
