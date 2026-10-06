@@ -146,6 +146,24 @@
   .life-drop { font-size: 20px; filter: drop-shadow(0 0 4px var(--frost-dim)); }
   .life-lost { opacity: .18; filter: none; }
 
+  #timer-wrap {
+    background: color-mix(in srgb, var(--panel) 82%, transparent);
+    border: 1px solid var(--panel-border);
+    border-radius: 12px;
+    padding: 8px 14px;
+    text-align: center;
+    backdrop-filter: blur(6px);
+  }
+  #timer-label { font-size: 11px; letter-spacing: .04em; color: var(--ink-dim); }
+  #timer {
+    font-size: 26px; font-weight: 700; color: var(--frost);
+    font-family: 'Space Grotesk', sans-serif;
+    line-height: 1.1;
+  }
+  /* Son 10 saniye: kırmızıya döner */
+  #timer-wrap.low { border-color: var(--bad); box-shadow: 0 0 0 3px var(--bad-glow); }
+  #timer-wrap.low #timer { color: var(--bad); }
+
   .overlay {
     position: absolute; inset: 0;
     display: flex; align-items: center; justify-content: center;
@@ -415,6 +433,10 @@
       <div id="score-label">PUAN</div>
       <div id="score">0</div>
     </div>
+    <div id="timer-wrap">
+      <div id="timer-label">SÜRE</div>
+      <div id="timer">2:00</div>
+    </div>
     <div id="lives"></div>
   </div>
 
@@ -425,6 +447,7 @@
     <div class="rules">
       <div class="rule-chip">✅ <b>Setteki alet</b> ise kes, puan kazan</div>
       <div class="rule-chip warn">💣 <b>Sette olmayan alet</b> ise dokunma</div>
+      <div class="rule-chip">⏱️ <b>2 dakika</b> içinde en çok aleti tanı</div>
     </div>
     <form class="player-form" id="player-form" autocomplete="on">
       <div class="field-row">
@@ -457,7 +480,7 @@
 
   <div class="overlay hidden" id="gameover-overlay">
     <div class="eyebrow-icon">🥶</div>
-    <h1 class="title">Set Tamamlandı Sayılmaz!</h1>
+    <h1 class="title" id="final-title">Set Tamamlandı Sayılmaz!</h1>
     <p id="final-score">0</p>
     <p class="lede" id="gameover-line">Sonuçlar aşağıda.</p>
     <div class="board-wrap" id="board-end-wrap">
@@ -474,7 +497,7 @@
     </div>
   </div>
 
-  <footer class="hint" id="hint-text">Kaydırarak kes · 3 can · zorluk zamanla artar</footer>
+  <footer class="hint" id="hint-text">Kaydırarak kes · 3 can · 2 dakika · zorluk zamanla artar</footer>
 </div>
 
 <!-- Three.js r128 (sabit sürüm, cdnjs). Yüklenemezse oyun tamamen 2D çalışmaya devam eder. -->
@@ -499,7 +522,6 @@
     { name: "Payet Kesici", emoji: "✂️", model: "straw-cutter", desc: "Payet ucunu düzgünce kesen özel makas." },
     { name: "Rektal Muayene Eldiveni", emoji: "🧤", model: "glove", desc: "Rektal girişte kullanılan tek kullanımlık uzun eldiven." },
     { name: "Kayganlaştırıcı", emoji: "🧫", model: "lubricant", desc: "Rektuma girişi kolaylaştıran sabunsuz solüsyon." },
-    { name: "Alkol", emoji: "🍶", model: "alcohol", desc: "Ekipmanın dezenfeksiyonunda kullanılan madde." },
     { name: "Kâğıt Havlu", emoji: "🧻", model: "paper-towel", desc: "Bölgeyi ve payeti kurulamakta kullanılır." },
     { name: "Payet", emoji: "🧬", model: "straw", desc: "Donmuş spermanın içinde saklandığı ince kamış." },
     { name: "Sıvı Azot", emoji: "❄️", model: "nitrogen", desc: "Payetleri -196°C'de tutan soğutucu sıvı." },
@@ -514,6 +536,7 @@
     { name: "Tımar Fırçası", emoji: "🪮", model: "wrong-brush", desc: "Hayvan bakımında kullanılır, tohumlama malzemesi değil." },
     { name: "Yem Kovası", emoji: "🪣", model: "wrong-feed-bucket", desc: "Yemleme için kullanılır." },
     { name: "Burun Pensi (Burunduruk)", emoji: "🗜️", model: "wrong-nose-ring", desc: "Hayvanı zapt etmek için kullanılır, tohumlama seti değil." },
+    { name: "Alkol", emoji: "🍶", model: "alcohol", desc: "Dezenfeksiyonda kullanılsa da tohumlama seti içeriğinde yer almaz." },
   ];
 
   const MODEL_DIR = "assets/models/";
@@ -869,6 +892,10 @@
   let score = 0;
   let lives = 3;
   const MAX_LIVES = 3;
+  const ROUND_MS = 2 * 60 * 1000;  // tur süresi: GERÇEK 2 dakika
+  // Not: elapsed oyun içi "yavaş saat"dir (dt * SPEED, SPEED=1/3). Süre sınırı
+  // oyuncuya görünen gerçek zaman olmalı, o yüzden duvar saatiyle tutulur.
+  let roundEndsAt = 0;             // performance.now() tabanlı bitiş anı
   let objects = [];
   let particles = [];
   let floaters = [];
@@ -894,13 +921,23 @@
     document.getElementById("score").textContent = score;
   }
 
+  // Kalan süreyi mm:ss olarak yaz; son 10 saniyede uyarı stili.
+  function updateTimerUI(ms){
+    const kalanSn = Math.max(0, ms) / 1000;
+    const sn = Math.ceil(kalanSn);                    // yukarı yuvarla: 0:01 görünür
+    document.getElementById("timer").textContent =
+      Math.floor(sn / 60) + ":" + String(sn % 60).padStart(2, "0");
+    document.getElementById("timer-wrap").classList.toggle("low", kalanSn <= 10);
+  }
+
   function resetGame(){
     R3D.clearAll(objects);
     score = 0; lives = MAX_LIVES;
     objects = []; particles = []; floaters = []; trail = [];
     lastSpawn = 0; spawnInterval = 1300; elapsed = 0;
     sliceHistory = []; seenCorrectNames.clear();
-    updateLivesUI(); updateScoreUI();
+    roundEndsAt = performance.now() + ROUND_MS;
+    updateLivesUI(); updateScoreUI(); updateTimerUI(ROUND_MS);
   }
 
   // ---------- Spawning ----------
@@ -991,7 +1028,7 @@
       addFloater(o.x, o.y, `✗ ${o.item.name}`, COLORS.bad);
       sliceHistory.push({ name: o.item.name, desc: o.item.desc, correct: false });
       if (lives <= 0){
-        setTimeout(endGame, 260);
+        setTimeout(() => endGame("can"), 260);
       }
     }
   }
@@ -1155,6 +1192,9 @@
     ctx.clearRect(0, 0, W, H);
 
     if (state === "playing"){
+      const kalan = roundEndsAt - now;
+      if (kalan <= 0){ updateTimerUI(0); endGame("sure"); return; }   // süre doldu
+      updateTimerUI(kalan);
       elapsed += dt * SPEED;
       spawnInterval = Math.max(520, 1300 - elapsed/60);
       lastSpawn += dt * SPEED;
@@ -1495,12 +1535,17 @@
     state = "playing";
   }
 
-  function endGame(){
+  function endGame(sebep){
     state = "over";
     document.getElementById("final-score").textContent = score;
     const lineEl = document.getElementById("gameover-line");
     const correctCount = seenCorrectNames.size;
-    lineEl.textContent = `${player ? player.ad + ", " : ""}${correctCount}/${CORRECT_ITEMS.length} doğru aleti tanıdın.`;
+    const sureDoldu = sebep === "sure";
+    document.getElementById("final-title").innerHTML = sureDoldu
+      ? "⏱️ Süre Doldu!"
+      : "Set Tamamlandı Sayılmaz!";
+    lineEl.textContent = (sureDoldu ? "⏱️ Süre doldu. " : "") +
+      `${player ? player.ad + ", " : ""}${correctCount}/${CORRECT_ITEMS.length} doğru aleti tanıdın.`;
 
     if (player){
       LB.submit({
